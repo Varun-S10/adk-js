@@ -25,12 +25,12 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 0 # Important: Fetch all history for git describe/log to work
+          ssh-key: ${{ secrets.RELEASE_DEPLOY_KEY }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
           node-version: '24'
-          ssh-key: ${{ secrets.RELEASE_DEPLOY_KEY }}
 
       - name: Install Dependencies
         run: npm install

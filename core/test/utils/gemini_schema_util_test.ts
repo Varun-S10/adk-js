@@ -136,4 +136,21 @@ describe("toGeminiSchema", () => {
 			properties: {},
 		});
 	});
+
+	it("handles empty items schema for arrays (e.g., items: {}) without crashing", () => {
+		const input = {
+			type: "array",
+			items: {}, // valid JSON Schema meaning "any", seen in AWS MCP server
+		};
+
+		expect(() => toGeminiSchema(input as any)).not.toThrow();
+
+		const schema = toGeminiSchema(input as any);
+
+		// For empty items schema, items type becomes TYPE_UNSPECIFIED
+		expect(schema).toMatchObject({
+			type: Type.ARRAY,
+			items: { type: Type.TYPE_UNSPECIFIED },
+		});
+	});
 });

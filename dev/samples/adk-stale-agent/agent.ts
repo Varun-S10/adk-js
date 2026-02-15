@@ -9,8 +9,6 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {parseISO} from 'date-fns';
 import {DateTime} from 'luxon';
-import fs from 'node:fs';
-import path from 'node:path';
 import {z} from 'zod';
 import {
   CLOSE_HOURS_AFTER_STALE_THRESHOLD,

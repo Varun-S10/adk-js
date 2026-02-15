@@ -11,6 +11,7 @@ export default async function autoAssign({ github, context }) {
   // Hardcoded assignee lists
   const issueAssigneesList = ['Varun-S10'];
   const prAssigneesList = ['Varun-S10'];
+  console.log('Auto-assignment script started');
 
   // Determine event type
   if (context.payload.issue) {

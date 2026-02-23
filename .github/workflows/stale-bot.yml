@@ -8,7 +8,7 @@ on:
 jobs:
   audit-stale-issues:
     if: github.repository == 'Varun-S10/adk-js'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 60
 
     permissions:
@@ -58,4 +58,4 @@ jobs:
           GRAPHQL_TIMELINE_LIMIT: ${{ secrets.GRAPHQL_TIMELINE_LIMIT }}
           SLEEP_BETWEEN_CHUNKS: ${{ secrets.SLEEP_BETWEEN_CHUNKS }}
 
-        run: npx tsx dev/samples/adk-stale-agent/main.ts
+        run: gtech-run "npx tsx dev/samples/adk-stale-agent/main.ts"

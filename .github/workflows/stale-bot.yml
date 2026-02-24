@@ -17,9 +17,14 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        # FIX 1: Corrected version tag
+        uses: actions/checkout@v4
+        with:
+          # SAFETY FIX: Forces a clean slate. 
+          clean: true
 
       - name: Set up Node.js
+        # FIX 2: Corrected version tag
         uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -34,16 +39,15 @@ jobs:
 
       - name: Build @google/adk (required)
         run: |
-          # If @google/adk is local or needs building
-          cd node_modules/@google/adk || true
-          npm install || true
-          npm run build || true
-          cd ../../../
+          if [ -d "node_modules/@google/adk" ]; then
+            cd node_modules/@google/adk
+            npm install && npm run build
+            cd ../../../
+        
 
       - name: Run Auditor Agent Script
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           CONCURRENCY_LIMIT: ${{ secrets.CONCURRENCY_LIMIT }}
           LLM_MODEL_NAME: ${{ secrets.LLM_MODEL_NAME }}
           NODE_PATH: dev/samples
@@ -57,5 +61,4 @@ jobs:
           GRAPHQL_EDIT_LIMIT: ${{ secrets.GRAPHQL_EDIT_LIMIT }}
           GRAPHQL_TIMELINE_LIMIT: ${{ secrets.GRAPHQL_TIMELINE_LIMIT }}
           SLEEP_BETWEEN_CHUNKS: ${{ secrets.SLEEP_BETWEEN_CHUNKS }}
-
         run: gtech-run "npx tsx dev/samples/adk-stale-agent/main.ts"

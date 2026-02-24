@@ -58,4 +58,4 @@ jobs:
           GRAPHQL_EDIT_LIMIT: ${{ secrets.GRAPHQL_EDIT_LIMIT }}
           GRAPHQL_TIMELINE_LIMIT: ${{ secrets.GRAPHQL_TIMELINE_LIMIT }}
           SLEEP_BETWEEN_CHUNKS: ${{ secrets.SLEEP_BETWEEN_CHUNKS }}
-        run: gtech-run "npx tsx dev/samples/adk-stale-agent/main.ts"
+        run: gtech-run npx tsx dev/samples/adk-stale-agent/main.ts

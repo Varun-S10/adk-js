@@ -171,6 +171,10 @@ export const DESCRIPTION_OPTION = new Option(
   '--description [string]',
   'Optional. The description for the Reasoning Engine.',
 );
+export const REPOSITORY_DEPLOY_OPTION = new Option(
+  '--repository [string]',
+  'Optional. Artifact Registry repository name to push docker images. Required for agent_engine deploy.',
+);
 
 /**
  * Creates the ADK CLI program.
@@ -440,6 +444,7 @@ export function createProgram(): Command {
       .addOption(REGION_DEPLOY_OPTION)
       .addOption(DISPLAY_NAME_OPTION)
       .addOption(DESCRIPTION_OPTION)
+      .addOption(REPOSITORY_DEPLOY_OPTION)
       .option(
         '--temp_folder [string]',
         'Optional. Temp folder for the generated source files (default: a timestamped folder in the system temp directory).',
@@ -464,6 +469,7 @@ export function createProgram(): Command {
             region: options['region'],
             displayName: options['display_name'],
             description: options['description'],
+            repository: options['repository'],
             tempFolder: options['temp_folder'],
             port: 8080, // Agent Engine requires fixed port of 8080
             withUi: getBoolean(options['with_ui']),

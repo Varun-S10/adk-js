@@ -17,10 +17,12 @@ import {
   InMemorySessionService,
   Logger,
   LogLevel,
+  RunConfig,
   Runner,
   StreamingMode,
   toA2a,
 } from '@google/adk';
+import {Content} from '@google/genai';
 import {trace, TracerProvider} from '@opentelemetry/api';
 import {SimpleSpanProcessor} from '@opentelemetry/sdk-trace-base';
 import cors from 'cors';
@@ -172,6 +174,13 @@ export class AdkApiServer {
           },
         }),
       );
+    } else {
+      app.get('/health', (req: Request, res: Response) => {
+        res.status(200).send('OK');
+      });
+      app.get('/', (req: Request, res: Response) => {
+        res.status(200).send('OK');
+      });
     }
 
     if (this.allowOrigins) {
@@ -730,12 +739,9 @@ export class AdkApiServer {
       });
 
       try {
-        await using agentFile = await this.agentLoader.getAgentFile(appName);
-        const agent = await agentFile.load();
-        const runner = await this.getRunner(agent, appName);
         const events: Event[] = [];
-
-        for await (const e of runner.runAsync({
+        for await (const e of this.executeAgentRun({
+          appName,
           userId,
           sessionId,
           newMessage,
@@ -752,6 +758,82 @@ export class AdkApiServer {
 
         res.status(500).json({error});
         this.logger.error(error);
+      }
+    });
+
+    app.post('/api/reasoning_engine', async (req: Request, res: Response) => {
+      this.logger.info(
+        `Received Reasoning Engine query headers: ${JSON.stringify(req.headers)}`,
+      );
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const executeQuery = async (body: any) => {
+        const input = body.input || {};
+        const appName = input.appName || body.appName;
+        const userId = input.userId || body.userId || 'default-user';
+        const sessionId =
+          input.sessionId || body.sessionId || 'default-session';
+        const newMessage = input.newMessage || body.newMessage;
+        const stateDelta = input.stateDelta || body.stateDelta;
+        if (!appName) {
+          res.status(400).json({error: 'appName is required in input'});
+          return;
+        }
+        try {
+          await this.sessionService.getOrCreateSession({
+            appName,
+            userId,
+            sessionId,
+            state: {},
+          });
+          const events: Event[] = [];
+          const abortController = new AbortController();
+          req.on('close', () => {
+            abortController.abort();
+          });
+          for await (const e of this.executeAgentRun({
+            appName,
+            userId,
+            sessionId,
+            newMessage,
+            stateDelta,
+            abortSignal: abortController.signal,
+          })) {
+            events.push(e);
+          }
+          res.json({output: events});
+        } catch (e: unknown) {
+          const error = `Failed to run agent via Reasoning Engine API: ${e}`;
+          res.status(500).json({error});
+          this.logger.error(error);
+        }
+      };
+
+      const isParsed =
+        req.body && (Object.keys(req.body).length > 0 || !req.readable);
+      if (isParsed) {
+        this.logger.info(
+          `Using already parsed body: ${JSON.stringify(req.body)}`,
+        );
+        await executeQuery(req.body);
+      } else {
+        let rawBody = '';
+        req.on('data', (chunk) => {
+          rawBody += chunk;
+        });
+        req.on('end', async () => {
+          this.logger.info(`Received Reasoning Engine raw body: ${rawBody}`);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          let body: any = {};
+          if (rawBody) {
+            try {
+              body = JSON.parse(rawBody);
+            } catch (e) {
+              this.logger.error(`Failed to parse raw body as JSON: ${e}`);
+            }
+          }
+          await executeQuery(body);
+        });
       }
     });
 
@@ -786,23 +868,20 @@ export class AdkApiServer {
       });
 
       try {
-        await using agentFile = await this.agentLoader.getAgentFile(appName);
-        const agent = await agentFile.load();
-        const runner = await this.getRunner(agent, appName);
-
         res.setHeader('Cache-Control', 'no-cache');
         res.setHeader('Content-Type', 'text/event-stream');
         res.setHeader('Connection', 'keep-alive');
         res.flushHeaders();
 
-        for await (const event of runner.runAsync({
+        for await (const event of this.executeAgentRun({
+          appName,
           userId,
           sessionId,
           newMessage,
+          stateDelta,
           runConfig: {
             streamingMode: streaming ? StreamingMode.SSE : StreamingMode.NONE,
           },
-          stateDelta,
           abortSignal: abortController.signal,
         })) {
           res.write(`data: ${JSON.stringify(event)}\n\n`);
@@ -900,5 +979,30 @@ export class AdkApiServer {
     }
 
     return this.runnerCache[appName];
+  }
+
+  private async *executeAgentRun(options: {
+    appName: string;
+    userId: string;
+    sessionId: string;
+    newMessage: Content;
+    stateDelta?: Record<string, unknown>;
+    runConfig?: RunConfig;
+    abortSignal: AbortSignal;
+  }): AsyncGenerator<Event> {
+    await using agentFile = await this.agentLoader.getAgentFile(
+      options.appName,
+    );
+    const agent = await agentFile.load();
+    const runner = await this.getRunner(agent, options.appName);
+
+    yield* runner.runAsync({
+      userId: options.userId,
+      sessionId: options.sessionId,
+      newMessage: options.newMessage,
+      runConfig: options.runConfig,
+      stateDelta: options.stateDelta,
+      abortSignal: options.abortSignal,
+    });
   }
 }

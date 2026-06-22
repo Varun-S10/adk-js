@@ -105,7 +105,7 @@ const HOST_OPTION = new Option(
 ).default('localhost');
 const PORT_OPTION = new Option(
   '-p, --port <number>',
-  'Optional. The port of the server',
+  'Optional. The port of the server. Default: 8000',
 ).default('8000');
 const ORIGINS_OPTION = new Option(
   '--allow_origins <string>',
@@ -436,7 +436,6 @@ export function createProgram(): Command {
       .addArgument(AGENT_DIR_ARGUMENT)
       .allowUnknownOption()
       .allowExcessArguments()
-      .addOption(PORT_OPTION)
       .addOption(PROJECT_DEPLOY_OPTION)
       .addOption(REGION_DEPLOY_OPTION)
       .addOption(DISPLAY_NAME_OPTION)
@@ -466,7 +465,7 @@ export function createProgram(): Command {
             displayName: options['display_name'],
             description: options['description'],
             tempFolder: options['temp_folder'],
-            port: parseInt(options['port'], 10),
+            port: 8080, // Agent Engine requires fixed port of 8080
             withUi: getBoolean(options['with_ui']),
             logLevel: options['log_level'],
             adkVersion: options['adk_version'],

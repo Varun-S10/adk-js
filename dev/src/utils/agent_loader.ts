@@ -9,6 +9,7 @@ import esbuild from 'esbuild';
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
 import {shimPlugin} from 'esbuild-shim-plugin';
+import * as fs from 'node:fs';
 import * as fsPromises from 'node:fs/promises';
 import * as path from 'node:path';
 import {pathToFileURL} from 'node:url';
@@ -22,6 +23,9 @@ import {
   removeFolder,
   tryToFindFileRecursively,
 } from './file_utils.js';
+import {AdkLogger} from './logger.js';
+
+const logger = new AdkLogger({label: 'AgentLoader', colorize: {all: true}});
 
 /**
  * Supported file extensions for JavaScript and TypeScript.
@@ -287,10 +291,12 @@ export class AgentFile {
 export class AgentLoader {
   private agentsAlreadyPreloaded = false;
   private readonly preloadedAgents: Record<string, AgentFile> = {};
+  private watcher?: fs.FSWatcher;
 
   constructor(
     private readonly agentsDirPath: string = process.cwd(),
     private readonly options = DEFAULT_AGENT_FILE_OPTIONS,
+    private readonly watchForChanges = false,
   ) {
     // Do cleanups on exit
     const exitHandler = async ({
@@ -316,6 +322,51 @@ export class AgentLoader {
     process.on('uncaughtException', () => exitHandler({exit: true}));
   }
 
+  /**
+   * Starts watching the agents directory for file changes. When a change is
+   * detected all cached agents are invalidated so they are reloaded on the
+   * next request.
+   */
+  private startWatching(): void {
+    if (this.watcher) {
+      return;
+    }
+
+    try {
+      this.watcher = fs.watch(
+        this.agentsDirPath,
+        {recursive: true},
+        (_event, filename) => {
+          if (filename && isJsFile(path.extname(filename))) {
+            logger.info(`Detected change in ${filename}, reloading agents...`);
+            this.invalidateAll();
+          }
+        },
+      );
+
+      this.watcher.on('error', (err) => {
+        logger.warn('File watcher error:', err.message);
+      });
+    } catch (err) {
+      logger.warn('Could not start file watcher:', (err as Error).message);
+    }
+  }
+
+  /**
+   * Disposes all cached agents and marks them for reload on the next request.
+   */
+  private invalidateAll(): void {
+    for (const agentFile of Object.values(this.preloadedAgents)) {
+      agentFile.dispose().catch(() => {});
+    }
+
+    for (const key of Object.keys(this.preloadedAgents)) {
+      delete this.preloadedAgents[key];
+    }
+
+    this.agentsAlreadyPreloaded = false;
+  }
+
   async listAgents(): Promise<string[]> {
     await this.preloadAgents();
 
@@ -329,6 +380,8 @@ export class AgentLoader {
   }
 
   async disposeAll(): Promise<void> {
+    this.watcher?.close();
+    this.watcher = undefined;
     await Promise.all(
       Object.values(this.preloadedAgents).map((f) => f.dispose()),
     );
@@ -356,6 +409,11 @@ export class AgentLoader {
     );
 
     this.agentsAlreadyPreloaded = true;
+
+    if (this.watchForChanges && !this.watcher) {
+      this.startWatching();
+    }
+
     return;
   }
 

@@ -203,7 +203,7 @@ describe('BasicLlmRequestProcessor', () => {
       model: 'test-basic-processor-model',
     });
     const runConfig: RunConfig = {
-      responseModalities: ['AUDIO' as unknown as Modality],
+      responseModalities: [Modality.AUDIO],
       speechConfig: {voiceConfig: {prebuiltVoiceConfig: {voiceName: 'Puck'}}},
       outputAudioTranscription: {},
       inputAudioTranscription: {},

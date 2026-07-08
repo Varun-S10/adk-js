@@ -47,7 +47,9 @@ export function getContents(
 
     // Skip events without content, or generated neither by user nor by model.
     // E.g. events purely for mutating session states.
-    if (!event.content?.role || event.content.parts?.[0]?.text === '') {
+    const role =
+      event.content?.role || (event.author === 'user' ? 'user' : undefined);
+    if (!role || event.content?.parts?.[0]?.text === '') {
       continue;
     }
 
@@ -82,6 +84,9 @@ export function getContents(
   const contents = [];
   for (const event of resultEvents) {
     const content = cloneDeep(event.content!);
+    if (!content.role && event.author === 'user') {
+      content.role = 'user';
+    }
     removeClientFunctionCallId(content);
     contents.push(content);
   }
